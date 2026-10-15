@@ -1,0 +1,27 @@
+name = "events"
+handle = "personalisation-events"
+type = "web_pixel_extension"
+uid = "b978d29b-f3bd-ad44-43cd-e1f7a947c9e9d26a8f6f"
+
+runtime_context = "strict"
+
+[customer_privacy]
+analytics = true
+marketing = true
+preferences = true
+sale_of_data = "disabled"
+
+[settings]
+type = "object"
+
+[settings.fields.storeId]
+name = "Public development store ID"
+description = "Public identifier used by the development proof receiver"
+type = "single_line_text_field"
+validations = [{ name = "min", value = "1" }]
+
+[settings.fields.endpoint]
+name = "Development event endpoint"
+description = "HTTPS URL of the development proof receiver"
+type = "single_line_text_field"
+validations = [{ name = "min", value = "1" }]

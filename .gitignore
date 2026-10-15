@@ -1,0 +1,13 @@
+node_modules/
+.next/
+dist/
+.env
+.env.*
+!.env.example
+work/
+playwright-report/
+test-results/
+.shopify/
+packages/database/generated/
+extensions/personalise/assets/personalise.js
+*.tsbuildinfo

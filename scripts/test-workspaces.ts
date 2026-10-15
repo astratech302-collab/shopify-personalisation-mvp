@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {readdir,readFile} from 'node:fs/promises';
+import pg from 'pg';
+import {readEnv} from '../packages/integrations/src/env';
+import {merchantHttp} from '../packages/integrations/src/merchant-http';
+import {ensureFirstWorkspace,requireWorkspace,readExperiment,addMember,requireSameOrigin} from '../packages/integrations/src/workspaces';
+const url=readEnv(process.env).DATABASE_URL;const schema='workspace_test_'+randomUUID().replaceAll('-','');const admin=new pg.Client({connectionString:url});await admin.connect();await admin.query(`CREATE SCHEMA "${schema}"`);
+const pool=new pg.Pool({connectionString:url,options:`-c search_path=${schema}`});let checks=0;
+try{
+ for(const file of (await readdir('packages/database/migrations')).filter(f=>/^20/.test(f)).sort())await pool.query(await readFile(`packages/database/migrations/${file}/migration.sql`,'utf8'));
+ const [a,aAgain,b]=await Promise.all([ensureFirstWorkspace(pool,'verified-user-a','A'),ensureFirstWorkspace(pool,'verified-user-a','A'),ensureFirstWorkspace(pool,'verified-user-b','B')]);assert.equal(a.id,aAgain.id);assert.notEqual(a.id,b.id);assert.equal((await pool.query('SELECT * FROM "Membership"')).rowCount,2);checks++;
+ assert.equal((await requireWorkspace(pool,'verified-user-a',a.id)).role,'owner');checks++;
+ await assert.rejects(requireWorkspace(pool,'verified-user-b',a.id),{code:'not_found'});await assert.rejects(requireWorkspace(pool,'verified-user-b','nonexistent'),{code:'not_found'});checks++;
+ await assert.rejects(requireWorkspace(pool,'',a.id),{code:'unauthorised'});checks++;
+ await pool.query('INSERT INTO "ShopInstallation" ("id","workspaceId","shopDomain","publicId") VALUES ($1,$2,$3,$4)',['s1',a.id,'fixture.myshopify.com','public1']);
+ await pool.query(`INSERT INTO "PageTarget" VALUES ('s1','page','product','fixture.example','/products/item','en','block');`);
+ await pool.query('INSERT INTO "Experiment" ("storeId","id","workspaceId","pageTargetId") VALUES ($1,$2,$3,$4)',['s1','copied-id',a.id,'page']);
+ assert.equal((await readExperiment(pool,'verified-user-a',a.id,'copied-id')).id,'copied-id');await assert.rejects(readExperiment(pool,'verified-user-b',b.id,'copied-id'),{code:'not_found'});await assert.rejects(readExperiment(pool,'verified-user-b',a.id,'copied-id'),{code:'not_found'});checks++;
+ await assert.rejects(addMember(pool,'verified-user-b',a.id,'intruder'),{code:'not_found'});checks++;
+ await addMember(pool,'verified-user-a',a.id,'verified-member');assert.equal((await requireWorkspace(pool,'verified-member',a.id)).role,'member');await assert.rejects(addMember(pool,'verified-member',a.id,'intruder'),{code:'not_found'});checks++;
+ requireSameOrigin('https://app.example','https://app.example/dashboard');for(const origin of [null,'https://evil.example','null','invalid'])assert.throws(()=>requireSameOrigin(origin,'https://app.example'),{code:'unauthorised'});checks++;
+ const sessionA=async()=>({userId:'verified-user-a',sessionId:'fixture-session-a'});const sessionB=async()=>({userId:'verified-user-b',sessionId:'fixture-session-b'});
+ const apiA=merchantHttp(pool,sessionA,'https://app.example');const apiB=merchantHttp(pool,sessionB,'https://app.example');const expired=merchantHttp(pool,async()=>null,'https://app.example');
+ const makeRequest=(body:unknown,origin='https://app.example')=>new Request('https://app.example/api/workspaces',{method:'POST',headers:{'Content-Type':'application/json',Origin:origin,'x-user-id':'verified-user-a'},body:JSON.stringify(body)});
+ assert.equal((await expired.list()).status,401);assert.equal((await expired.create(makeRequest({name:'Spoof'}))).status,401);checks++;
+ assert.equal((await apiA.create(makeRequest({name:'A'}))).status,200);assert.equal((await pool.query('SELECT * FROM "Membership" WHERE "userId"=$1',['verified-user-a'])).rowCount,1);checks++;
+ assert.equal((await apiA.create(makeRequest({name:'A'},'https://evil.example'))).status,401);assert.equal((await apiA.create(makeRequest({name:'A',workspaceId:b.id,userId:'verified-user-b',role:'owner'}))).status,400);checks++;
+ const ownList=await apiB.list();const ownBody=await ownList.json();assert.equal(ownBody.data.length,1);assert.equal(ownBody.data[0].id,b.id);checks++;
+ const copied=await apiB.experiment(a.id,'copied-id');const missing=await apiB.experiment(b.id,'does-not-exist');assert.equal(copied.status,404);assert.deepEqual(await copied.json(),await missing.json());checks++;
+ console.log(`workspace_checks_passed=${checks}; fixture_identities_only=true; live_clerk_signin=not_run`);
+}finally{await pool.end();await admin.query(`DROP SCHEMA "${schema}" CASCADE`);await admin.end();}

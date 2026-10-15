@@ -1,0 +1,17 @@
+{
+  "date": "2026-10-15",
+  "evidence": "local and fixture only",
+  "unitTests": 42,
+  "databaseConstraints": 12,
+  "durableJobChecks": 15,
+  "ingestionChecks": 23,
+  "workspaceSessionFixtureChecks": 13,
+  "browserApiTests": 12,
+  "lint": "pass",
+  "typecheck": "pass",
+  "build": "pass",
+  "workerLifecycle": "pass",
+  "gateA": "not passed",
+  "liveClerk": "not run",
+  "liveShopifyMeta": "not run"
+}

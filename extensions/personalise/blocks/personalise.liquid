@@ -1,0 +1,21 @@
+{% comment %}Gate A development proof block.{% endcomment %}
+{% if request.page_type == 'product' %}
+<div data-lp-block data-proof="{{ block.settings.proof_enabled }}" data-ad-id="{{ block.settings.proof_ad_id | escape }}" data-store="{{ block.settings.proof_store_id | escape }}" {{ block.shopify_attributes }}>
+  <h1 data-lp-headline>{{ block.settings.original_headline | escape }}</h1>
+  <p data-lp-description>{{ block.settings.original_description | escape }}</p>
+</div>
+{% endif %}
+{% schema %}
+{
+  "name": "Personalisation proof",
+  "target": "section",
+  "javascript": "personalise.js",
+  "settings": [
+    {"type":"text","id":"original_headline","label":"Original headline","default":"Original headline"},
+    {"type":"textarea","id":"original_description","label":"Original description","default":"Original description"},
+    {"type":"checkbox","id":"proof_enabled","label":"Enable development proof only","default":false},
+    {"type":"text","id":"proof_ad_id","label":"Development ad ID"},
+    {"type":"text","id":"proof_store_id","label":"Public development store ID"}
+  ]
+}
+{% endschema %}

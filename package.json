@@ -1,0 +1,58 @@
+{
+  "name": "shopify-personalisation",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "node --env-file=.env --import tsx scripts/dev.ts",
+    "dev:web": "pnpm --filter @mvp/web dev",
+    "dev:worker": "node --env-file=.env --import tsx apps/worker/src/index.ts",
+    "lint": "eslint . && node scripts/check-boundaries.mjs",
+    "typecheck": "prisma generate && tsc --noEmit && pnpm --filter @mvp/web typecheck",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:db": "node --env-file=.env --import tsx scripts/smoke-db.ts",
+    "build": "prisma generate && pnpm --filter @mvp/web build && node --import tsx scripts/build-worker.ts && pnpm build:extensions",
+    "build:extensions": "node --import tsx scripts/build-extensions.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "node --env-file=.env --import tsx packages/database/seed.ts",
+    "shopify": "shopify",
+    "test:constraints": "node --env-file=.env --import tsx scripts/test-constraints.ts",
+    "test:lifecycle": "node --env-file=.env --import tsx scripts/smoke-lifecycle.ts",
+    "proof:trace": "node --env-file=.env --import tsx scripts/proof-trace.ts",
+    "test:jobs": "node --env-file=.env --import tsx scripts/test-jobs.ts",
+    "jobs": "node --env-file=.env --import tsx scripts/jobs.ts",
+    "test:ingestion": "node --env-file=.env --import tsx scripts/test-ingestion.ts",
+    "test:workspaces": "node --env-file=.env --import tsx scripts/test-workspaces.ts"
+  },
+  "dependencies": {
+    "@prisma/client": "7.10.0",
+    "@prisma/adapter-pg": "7.10.0",
+    "pg": "8.23.1",
+    "pg-boss": "12.38.0",
+    "server-only": "0.0.1",
+    "zod": "4.6.7",
+    "@shopify/shopify-api": "15.0.1",
+    "@shopify/web-pixels-extension": "2.18.0"
+  },
+  "devDependencies": {
+    "@shopify/cli": "4.9.4",
+    "prisma": "7.10.0",
+    "typescript": "5.9.3",
+    "tsx": "4.23.15",
+    "vitest": "5.0.4",
+    "eslint": "10.12.0",
+    "@eslint/js": "10.0.1",
+    "typescript-eslint": "8.57.0",
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.5",
+    "@types/pg": "8.23.1",
+    "esbuild": "0.28.2",
+    "dotenv": "17.3.1"
+  },
+  "type": "module"
+}

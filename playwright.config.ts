@@ -1,0 +1,2 @@
+import {defineConfig} from '@playwright/test';
+export default defineConfig({testDir:'tests/e2e',use:{baseURL:'http://127.0.0.1:3000'},webServer:{command:'pnpm build:extensions && pnpm dev:web',url:'http://127.0.0.1:3000',reuseExistingServer:!process.env.CI,env:{DATABASE_URL:process.env.DATABASE_URL??'postgresql://mvp:mvp_local_only@localhost:55432/personalisation',APP_URL:'http://localhost:3000',INTEGRATIONS_MODE:'disabled',PROOF_MODE:'true'}}});

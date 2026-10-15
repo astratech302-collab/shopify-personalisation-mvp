@@ -1,0 +1,376 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ProofEvent {
+  id         String   @id
+  storeId    String
+  clientId   String
+  kind       String
+  occurredAt DateTime @db.Timestamptz(3)
+  receivedAt DateTime @default(now()) @db.Timestamptz(3)
+  payload    Json
+
+  @@index([storeId, clientId, occurredAt])
+}
+
+model WorkerHeartbeat {
+  id        String   @id
+  updatedAt DateTime @db.Timestamptz(3)
+}
+
+model Ad {
+  workspaceId     String
+  accountId       String
+  adSetId         String
+  id              String
+  destination     String?
+  creativeVersion String?
+  compatibility   String      @default("unverified")
+  syncedAt        DateTime?   @db.Timestamptz(3)
+  AdSet           AdSet       @relation(fields: [workspaceId, accountId, adSetId], references: [workspaceId, accountId, id], onDelete: NoAction, onUpdate: NoAction)
+  AdMapping       AdMapping[]
+
+  @@id([workspaceId, accountId, id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model AdAccount {
+  workspaceId      String         @unique
+  id               String
+  currency         String         @db.Char(3)
+  providerTimezone String
+  MetaConnection   MetaConnection @relation(fields: [workspaceId], references: [workspaceId], onDelete: NoAction, onUpdate: NoAction)
+  Campaign         Campaign[]
+
+  @@id([workspaceId, id])
+}
+
+model AdMapping {
+  workspaceId  String
+  storeId      String
+  experimentId String
+  accountId    String
+  adId         String
+  Ad           Ad           @relation(fields: [workspaceId, accountId, adId], references: [workspaceId, accountId, id], onDelete: NoAction, onUpdate: NoAction)
+  Experiment   Experiment   @relation(fields: [workspaceId, storeId, experimentId], references: [workspaceId, storeId, id], onDelete: NoAction, onUpdate: NoAction)
+  Assignment   Assignment[]
+
+  @@id([storeId, experimentId, adId])
+}
+
+model AdSet {
+  workspaceId String
+  accountId   String
+  campaignId  String
+  id          String
+  Ad          Ad[]
+  Campaign    Campaign @relation(fields: [workspaceId, accountId, campaignId], references: [workspaceId, accountId, id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([workspaceId, accountId, id])
+}
+
+model Aggregate {
+  storeId      String
+  experimentId String
+  revisionId   String
+  variantId    String
+  currency     String   @db.Char(3)
+  cohortDate   DateTime @db.Date
+  metrics      Json
+  rebuiltAt    DateTime @db.Timestamptz(3)
+  Variant      Variant  @relation(fields: [storeId, experimentId, revisionId, variantId], references: [storeId, experimentId, revisionId, id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([storeId, experimentId, revisionId, variantId, currency, cohortDate])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Assignment {
+  storeId      String
+  id           String
+  experimentId String
+  revisionId   String
+  variantId    String
+  visitorId    String
+  entryAdId    String
+  assignedAt   DateTime       @db.Timestamptz(3)
+  environment  String
+  AdMapping    AdMapping      @relation(fields: [storeId, experimentId, entryAdId], references: [storeId, experimentId, adId], onDelete: NoAction, onUpdate: NoAction)
+  Variant      Variant        @relation(fields: [storeId, experimentId, revisionId, variantId], references: [storeId, experimentId, revisionId, id], onDelete: NoAction, onUpdate: NoAction)
+  Event        Event[]
+  IdentityLink IdentityLink[]
+  Purchase     Purchase[]
+
+  @@id([storeId, id])
+  @@unique([storeId, experimentId, visitorId])
+}
+
+model AuditRecord {
+  id          String    @id
+  workspaceId String
+  actorId     String
+  action      String
+  objectId    String
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  Workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Campaign {
+  workspaceId String
+  accountId   String
+  id          String
+  name        String
+  AdSet       AdSet[]
+  AdAccount   AdAccount @relation(fields: [workspaceId, accountId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([workspaceId, accountId, id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Event {
+  storeId          String
+  id               String
+  source           String
+  providerEventId  String
+  assignmentId     String?
+  clientId         String
+  kind             String
+  occurredAt       DateTime         @db.Timestamptz(3)
+  receivedAt       DateTime         @default(now()) @db.Timestamptz(3)
+  payload          Json
+  environment      String
+  Assignment       Assignment?      @relation(fields: [storeId, assignmentId], references: [storeId, id], onDelete: NoAction, onUpdate: NoAction)
+  ShopInstallation ShopInstallation @relation(fields: [storeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([storeId, id])
+  @@unique([storeId, source, providerEventId])
+  @@index([storeId, clientId, occurredAt], map: "Event_identity_date_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Experiment {
+  storeId          String
+  id               String
+  workspaceId      String
+  pageTargetId     String
+  status           String            @default("draft")
+  version          Int               @default(1)
+  endedAt          DateTime?         @db.Timestamptz(3)
+  AdMapping        AdMapping[]
+  PageTarget       PageTarget        @relation(fields: [storeId, pageTargetId], references: [storeId, id], onDelete: NoAction, onUpdate: NoAction)
+  ShopInstallation ShopInstallation  @relation(fields: [workspaceId, storeId], references: [workspaceId, id], onDelete: NoAction, onUpdate: NoAction)
+  Revision         Revision[]
+  StoreReservation StoreReservation?
+
+  @@id([storeId, id])
+  @@unique([workspaceId, storeId, id])
+}
+
+model IdentityLink {
+  storeId      String
+  assignmentId String
+  clientId     String
+  linkedAt     DateTime   @default(now()) @db.Timestamptz(3)
+  Assignment   Assignment @relation(fields: [storeId, assignmentId], references: [storeId, id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([storeId, assignmentId, clientId])
+  @@index([storeId, clientId, linkedAt], map: "IdentityLink_client_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Membership {
+  workspaceId String
+  userId      String
+  role        String
+  Workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([workspaceId, userId])
+}
+
+model MetaConnection {
+  workspaceId    String     @id
+  encryptedToken String?
+  keyVersion     Int?
+  expiresAt      DateTime?  @db.Timestamptz(3)
+  scopes         String[]   @default([])
+  status         String     @default("pending")
+  AdAccount      AdAccount?
+  Workspace      Workspace  @relation(fields: [workspaceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model Outbox {
+  id             String    @id
+  workspaceId    String
+  kind           String
+  idempotencyKey String
+  payload        Json
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  availableAt    DateTime  @default(now()) @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  Workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  lastErrorCode String?
+  WebhookReceipt WebhookReceipt[]
+  @@unique([workspaceId, idempotencyKey])
+  @@index([status, availableAt], map: "Outbox_pending_idx")
+}
+
+model PageTarget {
+  storeId          String
+  id               String
+  productId        String
+  host             String
+  canonicalPath    String
+  locale           String
+  blockId          String
+  Experiment       Experiment[]
+  ShopInstallation ShopInstallation @relation(fields: [storeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([storeId, id])
+  @@unique([storeId, host, canonicalPath, locale, blockId])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Publication {
+  storeId      String
+  id           String
+  experimentId String
+  revisionId   String
+  generation   Int
+  mode         String
+  status       String
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  Revision     Revision @relation(fields: [storeId, experimentId, revisionId], references: [storeId, experimentId, id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([storeId, id])
+  @@unique([storeId, generation])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Purchase {
+  storeId          String
+  id               String
+  assignmentId     String?
+  clientId         String
+  occurredAt       DateTime         @db.Timestamptz(3)
+  observedSubtotal Decimal          @db.Decimal(20, 6)
+  currency         String           @db.Char(3)
+  matchState       String           @default("unmatched")
+  environment      String
+  Assignment       Assignment?      @relation(fields: [storeId, assignmentId], references: [storeId, id], onDelete: NoAction, onUpdate: NoAction)
+  ShopInstallation ShopInstallation @relation(fields: [storeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  PurchaseAlias    PurchaseAlias[]
+
+  @@id([storeId, id])
+  @@index([storeId, clientId, occurredAt], map: "Purchase_identity_date_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model PurchaseAlias {
+  storeId    String
+  kind       String
+  providerId String
+  purchaseId String
+  Purchase   Purchase @relation(fields: [storeId, purchaseId], references: [storeId, id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([storeId, kind, providerId])
+}
+
+model Revision {
+  storeId      String
+  experimentId String
+  id           String
+  snapshot     Json
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  Publication  Publication[]
+  Experiment   Experiment    @relation(fields: [storeId, experimentId], references: [storeId, id], onDelete: NoAction, onUpdate: NoAction)
+  Variant      Variant[]
+
+  @@id([storeId, experimentId, id])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ShopInstallation {
+  id             String       @id
+  workspaceId    String       @unique
+  shopDomain     String       @unique
+  publicId       String       @unique
+  generation     Int          @default(1)
+  status         String       @default("pending")
+  encryptedToken String?
+  keyVersion     Int?
+  scopes         String[]     @default([])
+  tokenExpiresAt DateTime?    @db.Timestamptz(3)
+  Event          Event[]
+  Experiment     Experiment[]
+  PageTarget     PageTarget[]
+  Purchase       Purchase[]
+  WebhookReceipt WebhookReceipt[]
+  IngestionWindow IngestionWindow[]
+  Workspace      Workspace    @relation(fields: [workspaceId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([workspaceId, id])
+}
+
+model StoreReservation {
+  storeId      String     @id
+  experimentId String
+  reservedAt   DateTime   @default(now()) @db.Timestamptz(3)
+  releaseAfter DateTime?  @db.Timestamptz(3)
+  Experiment   Experiment @relation(fields: [storeId, experimentId], references: [storeId, id], onDelete: NoAction, onUpdate: NoAction)
+  @@unique([storeId, experimentId])
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model Variant {
+  storeId       String
+  experimentId  String
+  revisionId    String
+  id            String
+  headline      String
+  description   String
+  allocationBps Int
+  Aggregate     Aggregate[]
+  Assignment    Assignment[]
+  Revision      Revision     @relation(fields: [storeId, experimentId, revisionId], references: [storeId, experimentId, id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@id([storeId, experimentId, revisionId, id])
+}
+
+model Workspace {
+  id               String            @id
+  name             String
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  AuditRecord      AuditRecord[]
+  Membership       Membership[]
+  MetaConnection   MetaConnection?
+  Outbox           Outbox[]
+  ShopInstallation ShopInstallation?
+}
+
+model WebhookReceipt {
+ storeId String
+ installationGeneration Int
+ providerEventId String
+ topic String
+ outboxId String
+ receivedAt DateTime @default(now()) @db.Timestamptz(3)
+ ShopInstallation ShopInstallation @relation(fields:[storeId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ Outbox Outbox @relation(fields:[outboxId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@id([storeId,installationGeneration,providerEventId])
+}
+
+model IngestionWindow {
+ storeId String
+ minute DateTime @db.Timestamptz(3)
+ events Int
+ ShopInstallation ShopInstallation @relation(fields:[storeId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@id([storeId,minute])
+ @@index([minute],map:"IngestionWindow_minute_idx")
+}

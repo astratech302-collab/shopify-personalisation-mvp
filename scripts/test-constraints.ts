@@ -1,0 +1,46 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {readFile} from 'node:fs/promises';
+import pg from 'pg';
+import {readEnv} from '../packages/integrations/src/env';
+const url=readEnv(process.env).DATABASE_URL;
+const schema=`test_${randomUUID().replaceAll('-','')}`;
+const admin=new pg.Client({connectionString:url});await admin.connect();
+await admin.query(`CREATE SCHEMA "${schema}"`);
+const pool=new pg.Pool({connectionString:url,options:`-c search_path=${schema} -c statement_timeout=5000`});
+let checks=0;
+async function rejected(sql:string,code:string){try{await pool.query(sql);throw new Error('constraint_missing');}catch(error){assert.equal((error as {code?:string}).code,code);checks++;}}
+try{
+ for(const file of ['202610150001_proof','202610150002_domain','202610150003_reservation_lock','202610150004_reservation_relation','202610150005_validation_states','202610150006_job_foundation','202610150007_ingestion_limit'])await pool.query(await readFile(`packages/database/migrations/${file}/migration.sql`,'utf8'));
+ await pool.query(`INSERT INTO "Workspace" VALUES ('w1','One'),('w2','Two');
+ INSERT INTO "ShopInstallation" ("id","workspaceId","shopDomain","publicId") VALUES ('s1','w1','one.myshopify.com','public1'),('s2','w2','two.myshopify.com','public2');
+ INSERT INTO "PageTarget" VALUES ('s1','page','product1','one.example','/products/item','en','block1'),('s2','page','product2','two.example','/products/item','en','block2');
+ INSERT INTO "Experiment" ("storeId","id","workspaceId","pageTargetId") VALUES ('s1','e1','w1','page'),('s1','e2','w1','page'),('s2','e1','w2','page');`);
+ await rejected(`INSERT INTO "Experiment" ("storeId","id","workspaceId","pageTargetId") VALUES ('s1','bad','w2','page')`,'23503');
+ await rejected(`UPDATE "Experiment" SET "status"='running' WHERE "storeId"='s1' AND "id"='e1'`,'23514');
+ const races=await Promise.allSettled(['e1','e2'].map(id=>pool.query('INSERT INTO "StoreReservation" ("storeId","experimentId") VALUES ($1,$2)',['s1',id])));
+ assert.equal(races.filter(r=>r.status==='fulfilled').length,1);assert.equal(races.filter(r=>r.status==='rejected').length,1);checks++;
+ const {rows:[reservation]}=await pool.query('SELECT * FROM "StoreReservation" WHERE "storeId"=$1',['s1']);
+ await pool.query('UPDATE "Experiment" SET "status"=$1 WHERE "storeId"=$2 AND "id"=$3',['running','s1',reservation.experimentId]);
+ await rejected(`DELETE FROM "StoreReservation" WHERE "storeId"='s1'`,'23514');
+ await pool.query(`INSERT INTO "Revision" ("storeId","experimentId","id","snapshot") VALUES ('s1','e1','r1','{}');
+ INSERT INTO "Variant" VALUES ('s1','e1','r1','original','Original','Description',5000),('s1','e1','r1','A','Alternative','Description',5000);`);
+ await rejected(`UPDATE "Revision" SET "snapshot"='{"changed":true}' WHERE "storeId"='s1'`,'23514');
+ await rejected(`UPDATE "Variant" SET "headline"='Changed' WHERE "storeId"='s1'`,'23514');
+ await pool.query(`INSERT INTO "MetaConnection" ("workspaceId") VALUES ('w1'),('w2');
+ INSERT INTO "AdAccount" VALUES ('w1','account1','USD','America/New_York'),('w2','account2','INR','Asia/Kolkata');
+ INSERT INTO "Campaign" VALUES ('w1','account1','campaign','Campaign'),('w2','account2','campaign','Campaign');
+ INSERT INTO "AdSet" VALUES ('w1','account1','campaign','set'),('w2','account2','campaign','set');
+ INSERT INTO "Ad" ("workspaceId","accountId","adSetId","id") VALUES ('w1','account1','set','123'),('w2','account2','set','456');
+ INSERT INTO "AdMapping" VALUES ('w1','s1','e1','account1','123');`);
+ await rejected(`INSERT INTO "AdMapping" VALUES ('w2','s1','e1','account2','456')`,'23503');
+ await pool.query(`INSERT INTO "Assignment" VALUES ('s1','assignment1','e1','r1','original','visitor1','123',CURRENT_TIMESTAMP,'test');`);
+ await rejected(`INSERT INTO "Assignment" VALUES ('s1','assignment2','e1','r1','A','visitor1','123',CURRENT_TIMESTAMP,'test')`,'23505');
+ await rejected(`UPDATE "Assignment" SET "entryAdId"='456' WHERE "id"='assignment1'`,'23514');
+ await pool.query(`INSERT INTO "Purchase" VALUES ('s1','purchase1','assignment1','client1',CURRENT_TIMESTAMP,12.345678,'USD','joined','test');
+ INSERT INTO "PurchaseAlias" VALUES ('s1','checkout','checkout1','purchase1'),('s1','order','order1','purchase1');`);
+ const {rows:[purchase]}=await pool.query('SELECT "observedSubtotal" FROM "Purchase"');assert.equal(purchase.observedSubtotal,'12.345678');checks++;
+ await rejected(`INSERT INTO "PurchaseAlias" VALUES ('s1','order','order1','purchase1')`,'23505');
+ await rejected(`INSERT INTO "Purchase" VALUES ('s2','purchase2','assignment1','client1',CURRENT_TIMESTAMP,10,'USD','joined','test')`,'23503');
+ console.log(`domain_constraint_checks_passed=${checks}; empty_schema_migrations=pass; concurrent_reservation=pass`);
+}finally{await pool.end();await admin.query(`DROP SCHEMA "${schema}" CASCADE`);await admin.end();}

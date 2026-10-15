@@ -1,0 +1,11 @@
+# Development app Client ID supplied by owner; authenticated CLI linking and URLs remain pending.
+client_id = "6384f07eda5fc4427ddc9ad1a5d9ee9b"
+name = "Personalisation feasibility"
+application_url = "https://example.invalid"
+embedded = false
+[access_scopes]
+scopes = "read_products,write_pixels,read_customer_events"
+[auth]
+redirect_urls = ["https://example.invalid/api/shopify/callback"]
+[webhooks]
+api_version = "2026-10"
