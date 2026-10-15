@@ -26,3 +26,9 @@ test('merchant APIs remain closed without configured verified sessions',async({r
  const foreign=await request.get('/api/workspaces/copied-workspace/experiments/copied-experiment',{headers});expect(foreign.status()).toBe(401);
  const create=await request.post('/api/workspaces',{headers:{...headers,Origin:'http://localhost:3000'},data:{name:'Pretend workspace',userId:'pretend-owner'}});expect(create.status()).toBe(401);
 });
+
+test('Shopify connection endpoints require real merchant sessions',async({request})=>{
+ const callback=await request.get('/api/shopify/callback?shop=fixture.myshopify.com&state=pretend&code=pretend');expect(callback.status()).toBe(401);
+ const connection=await request.get('/api/workspaces/copied-workspace/shopify');expect(connection.status()).toBe(401);
+ const connect=await request.post('/api/workspaces/copied-workspace/shopify/connect',{headers:{Origin:'http://localhost:3000','x-user-id':'pretend-owner'},data:{shop:'fixture.myshopify.com'}});expect(connect.status()).toBe(401);
+});

@@ -27,7 +27,9 @@
     "test:jobs": "node --env-file=.env --import tsx scripts/test-jobs.ts",
     "jobs": "node --env-file=.env --import tsx scripts/jobs.ts",
     "test:ingestion": "node --env-file=.env --import tsx scripts/test-ingestion.ts",
-    "test:workspaces": "node --env-file=.env --import tsx scripts/test-workspaces.ts"
+    "test:workspaces": "node --env-file=.env --import tsx scripts/test-workspaces.ts",
+    "test:shopify": "node --env-file=.env --import tsx scripts/test-shopify.ts",
+    "test:shopify-webhooks": "node --env-file=.env --import tsx scripts/test-shopify-webhooks.ts"
   },
   "dependencies": {
     "@prisma/client": "7.10.0",

@@ -55,13 +55,17 @@ This fallback binds loopback only and uses local trust authentication. It must n
 ## Repository map
 
 - `apps/web`: Next.js workspace status, health, durable /api/events ingestion, development fixture and proof receiver.
-- `apps/worker`: pg-boss lifecycle, transactional outbox processing, failure reconciliation and heartbeat; only a local audit handler is enabled.
+- `apps/worker`: pg-boss lifecycle, transactional outbox processing, failure reconciliation and heartbeat; local audit and generation-aware Shopify lifecycle handlers are available.
 - `packages/contracts`, `packages/domain`: browser-safe versioned contracts, lifecycle/error rules and proof helpers.
 - `packages/database`: Prisma schema, SQL migrations and server persistence.
-- `packages/integrations`: encryption, read-only provider adapters, durable jobs/receipts, ingestion and workspace services; live connections pending.
-- `extensions/personalise`, `extensions/events`: unregistered prototypes, awaiting official Shopify scaffolding under an authorised account.
+- `packages/integrations`: encryption, Shopify OAuth/refresh and lifecycle services, provider readers, durable jobs/receipts, ingestion and workspace services; live acceptance pending.
+- `extensions/personalise`, `extensions/events`: officially generated proof extensions, uploaded in an unreleased development app version.
 - `docs/evidence`: actual local verification and explicit pending platform matrix.
 
 `build:extensions` bundles prototype source locally. It does **not** claim Shopify extension validation. Follow the official generator instructions in the external setup document before running a real platform build. Do not deploy the placeholder Shopify app config.
 
 Current local contracts, server infrastructure and event ingestion are documented in `docs/contracts-and-domain.md`, `docs/infrastructure.md` and `docs/ingestion.md`. T05 Clerk/session routes and minimal account pages are wired; actual Clerk sign-in acceptance remains pending; see `docs/workspace-access.md`. All provider tests are fixtures.
+
+## Shopify development without Meta
+
+See [Shopify connection setup and verified limits](docs/shopify-connection.md). Keep `INTEGRATIONS_MODE=disabled`; the independent `SHOPIFY_INTEGRATION_MODE=enabled` switch requires real Clerk keys, a public HTTPS app origin and local encryption credentials. `pnpm test:shopify` and `pnpm test:shopify-webhooks` use fixture transports and isolated PostgreSQL/queue schemas, with no provider mutations.

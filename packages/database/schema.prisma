@@ -304,6 +304,8 @@ model ShopInstallation {
   generation     Int          @default(1)
   status         String       @default("pending")
   encryptedToken String?
+  encryptedRefreshToken String?
+  refreshTokenExpiresAt DateTime? @db.Timestamptz(3)
   keyVersion     Int?
   scopes         String[]     @default([])
   tokenExpiresAt DateTime?    @db.Timestamptz(3)
@@ -348,6 +350,7 @@ model Workspace {
   name             String
   createdAt        DateTime          @default(now()) @db.Timestamptz(3)
   AuditRecord      AuditRecord[]
+  ShopifyOAuthAttempt ShopifyOAuthAttempt[]
   Membership       Membership[]
   MetaConnection   MetaConnection?
   Outbox           Outbox[]
@@ -373,4 +376,19 @@ model IngestionWindow {
  ShopInstallation ShopInstallation @relation(fields:[storeId],references:[id],onDelete:NoAction,onUpdate:NoAction)
  @@id([storeId,minute])
  @@index([minute],map:"IngestionWindow_minute_idx")
+}
+
+model ShopifyOAuthAttempt {
+ stateHash String @id
+ workspaceId String
+ userId String
+ sessionId String
+ shopDomain String
+ browserHash String
+ createdAt DateTime @default(now()) @db.Timestamptz(3)
+ expiresAt DateTime @db.Timestamptz(3)
+ status String @default("pending")
+ finishedAt DateTime? @db.Timestamptz(3)
+ Workspace Workspace @relation(fields:[workspaceId],references:[id],onDelete:NoAction,onUpdate:NoAction)
+ @@index([expiresAt],map:"ShopifyOAuthAttempt_expiry_idx")
 }

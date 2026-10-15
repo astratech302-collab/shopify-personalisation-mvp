@@ -1,5 +1,6 @@
 import pg from 'pg';
 import {JOB_QUEUE,JOB_OPTIONS,runQueuedJob,reconcileJobs} from '../../../packages/integrations/src/jobs';
+import {shopifyLifecycleHandlers} from '../../../packages/integrations/src/shopify-webhooks';
 import {foundationHandlers} from '../../../packages/integrations/src/foundation-handlers';
 import {PgBoss} from 'pg-boss';
 import {readEnv} from '../../../packages/integrations/src/env';
@@ -11,7 +12,7 @@ boss.on('error',()=>console.error('queue_error'));
 await boss.start();
 const pool=new pg.Pool({connectionString:env.DATABASE_URL});
 await boss.createQueue(JOB_QUEUE,JOB_OPTIONS);
-await boss.work<{outboxId:string}>(JOB_QUEUE,{pollingIntervalSeconds:1,batchSize:1,perJobResults:true},async jobs=>Promise.all(jobs.map(job=>runQueuedJob(pool,job,foundationHandlers))));
+await boss.work<{outboxId:string}>(JOB_QUEUE,{pollingIntervalSeconds:1,batchSize:1,perJobResults:true},async jobs=>Promise.all(jobs.map(job=>runQueuedJob(pool,job,{...foundationHandlers,...shopifyLifecycleHandlers}))));
 async function beat(){await reconcileJobs(pool,boss);await db.workerHeartbeat.upsert({where:{id:'worker'},create:{id:'worker',updatedAt:new Date()},update:{updatedAt:new Date()}});}
 await beat();
 console.log('worker_ready');
